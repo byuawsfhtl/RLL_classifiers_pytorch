@@ -1,0 +1,27 @@
+paths:
+  model_weights_directory: /grphome/fslg_census/compute/machine_learning_models/classification_models/general_weights
+  telemetry_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/telemetry
+  image_paths_and_labels: /home/jroubido/fsl_groups/fslg_census/compute/machine_learning_models/latent_feature_clustering/temp_datasets/us_census_1940_sampled/sampled_data.tsv
+
+dataset_params:
+  dataset_name: Alabama_and_US_Census_gender_snippets
+  inference: False
+  batch_size: 10
+  random_split: True
+  stratified_split: True
+  test_size: .2
+
+model_architecture_parameters:
+  model_name: resnet50
+  output_classes: 10
+
+model_hyper_parameters:
+  learning_rate: .001
+  epochs: 200
+  optimizer_name: adam
+  weight_decay: 0
+
+other_parameters:
+  early_stopping: False
+  track_val_every_n_epochs: 20
+  version: 3
