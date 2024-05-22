@@ -7,6 +7,7 @@ dataset_params:
   dataset_name: Alabama_and_US_Census_gender_snippets
   inference: False
   batch_size: 10
+  hold_images_in_RAM: False
   random_split: True
   stratified_split: True
   test_size: .2

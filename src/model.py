@@ -1,7 +1,7 @@
 import torch
 import torchvision.models as networks
 
-def select_model(model_name: str, output_classes: int):
+def select_model(model_name: str, output_classes: int, device: str):
     '''
     This function takes in a model name as input and returns a model with other specified parameters.
 
@@ -9,7 +9,6 @@ def select_model(model_name: str, output_classes: int):
         model_name: The name of a given model. 
         output_classes: The number of output classes for a given model. 
     '''
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if model_name == 'vgg11':
         return networks.vgg11(num_classes=output_classes).to(device)
