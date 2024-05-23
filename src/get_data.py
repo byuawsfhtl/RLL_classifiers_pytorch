@@ -49,17 +49,31 @@ class ImageDatasetInRAM(Dataset):
 
 class DatasetCreator():
 
-    def __init__(self):
-        pass
 
     def convert_classes_to_int(self, df: pd.DataFrame):
+        class_to_int = self.get_class_to_int_map(df)
+
+        df['class_index'] = df['label'].map(lambda x: class_to_int.get(x))
+
+
+    def get_class_to_int_map(self, df: pd.DataFrame):
         unique_classes = df['label'].unique()
         class_to_int = {}
 
         for i, class_ in enumerate(sorted(unique_classes)):
             class_to_int[class_] = i
 
-        df['class_index'] = df['label'].map(lambda x: class_to_int.get(x))
+        return class_to_int
+
+
+    def get_int_to_class_map(self, df: pd.DataFrame):
+        unique_classes = df['label'].unique()
+        class_to_int = {}
+
+        for i, class_ in enumerate(sorted(unique_classes)):
+            class_to_int[i] = class_
+
+        return class_to_int
 
 
     def stratified_sampling(self, labels_and_paths: pd.DataFrame, random_state: int, test_size: float):

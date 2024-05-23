@@ -1,6 +1,7 @@
 paths:
   model_weights_directory: /grphome/fslg_census/compute/machine_learning_models/classification_models/general_weights
-  telemetry_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/telemetry
+  transfer_learn_weights_name:
+  metrics_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/telemetry
   image_paths_and_labels: /home/jroubido/fsl_groups/fslg_census/compute/machine_learning_models/latent_feature_clustering/temp_datasets/us_census_1940_sampled/sampled_data.tsv
 
 dataset_params:

@@ -3,11 +3,23 @@ import pandas as pd
 import os
 import yaml
 import sys
+import csv
 from tqdm import tqdm
 from torchmetrics.classification import MulticlassAccuracy
 sys.path.append('/grphome/fslg_census/compute/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
 from src.model import select_model 
 from src.get_data import DatasetCreator, Augmenter
+
+
+class CustomException(Exception):
+    """A custom exception class. Used to identify error with our scripts."""
+
+    def __init__(self, message=""):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}: {self.message}"
 
 
 def load_config(config_file):
@@ -31,6 +43,8 @@ def train_step(data_loader, augmenter, model, device, optimizer, loss_objective,
     loss_over_step = 0
     classification_accuracy = 0
     number_batches = len(data_loader)
+
+    model.train()
 
     for images, labels in data_loader:
         images, labels = augmenter.augment_images(images, labels)
@@ -60,17 +74,20 @@ def validation_step(data_loader, model, device, loss_objective, accuracy_objecti
     classification_accuracy = 0
     number_batches = len(data_loader)
 
-    for images, labels in data_loader:
-        images = images.to(torch.float32).to(device)
-        labels = labels.to(device)
+    model.eval()
 
-        predictions = model(images)
-        loss = loss_objective(predictions, labels)
+    with torch.no_grad():
+        for images, labels in data_loader:
+            images = images.to(torch.float32).to(device)
+            labels = labels.to(device)
 
-        loss_over_step += loss.item()
-        
-        predicted_classes = torch.argmax(predictions, dim=1)
-        classification_accuracy += accuracy_objective(predicted_classes.cpu(), labels.cpu()).item()
+            predictions = model(images)
+            loss = loss_objective(predictions, labels)
+
+            loss_over_step += loss.item()
+            
+            predicted_classes = torch.argmax(predictions, dim=1)
+            classification_accuracy += accuracy_objective(predicted_classes.cpu(), labels.cpu()).item()
 
     average_loss = loss_over_step / number_batches
     average_accuracy = classification_accuracy / number_batches
@@ -78,67 +95,79 @@ def validation_step(data_loader, model, device, loss_objective, accuracy_objecti
     return round(average_loss, 4), round(average_accuracy, 4)
     
 
-def train(train_dataloader, val_dataloader, augmenter, model, device, model_name: str, optimizer, loss_objective, accuracy_objective, telemetry: dict, file_paths: dict, model_hyper_parameters: dict, other_parameters: dict):
-    epochs = model_hyper_parameters['epochs']
-    version = other_parameters['version']
-    early_stopping = other_parameters['early_stopping']
-    track_val_every_n_epochs = other_parameters['track_val_every_n_epochs']
-    model_weights_dir = file_paths['model_weights_directory']
-    telemetry_dir_path = file_paths['telemetry_dir_path']
-    telemetry_filename = f'{model_name}_v{version}.tsv'
+def train(train_dataloader, val_dataloader, augmenter, model, device, model_name: str, optimizer, loss_objective, accuracy_objective, config: dict):
+    
+    epochs = config['model_hyper_parameters']['epochs']
+    version = config['other_parameters']['version']
+    early_stopping = config['other_parameters']['early_stopping']
+    track_val_every_n_epochs = config['other_parameters']['track_val_every_n_epochs']
+    model_weights_dir = config['paths']['model_weights_directory']
+    metrics_dir_path = config['paths']['metrics_dir_path']
+    metrics_filename = f'{model_name}_v{version}.tsv'
+    
+    metrics = []
+    val_loss_scores = []
+
+    initialize_metrics_file(metrics_dir_path, metrics_filename)
 
     for epoch in tqdm(range(epochs)):
         train_loss, train_accuracy = train_step(train_dataloader, augmenter, model, device, optimizer, loss_objective, accuracy_objective)
-        telemetry['train'].append((epoch, train_loss, train_accuracy))
 
         if epoch % track_val_every_n_epochs == 0:
             val_loss, val_accuracy = validation_step(val_dataloader, model, device, loss_objective, accuracy_objective)
-            telemetry['val'].append((epoch, val_loss, val_accuracy))
+            
+            metrics.append([epoch, train_loss, train_accuracy, val_loss, val_accuracy])
+            val_loss_scores.append(val_loss)
 
             if early_stopping:
-                if len(telemetry['val']) > 2:
-                    if (telemetry['val'][-2][1] < telemetry['val'][-1][1]) and (telemetry['val'][-3][1] < telemetry['val'][-2][1]):
+                if len(val_loss_scores) > 2:
+                    if (val_loss_scores[-2] < val_loss_scores[-1]) and (val_loss_scores[-3] < val_loss_scores[-2]):
                         break
                     else:
                         new_model_name = f'{model_name}_v{version}.pt'
-                        save_model_weights(model, model_weights_dir, new_model_name)
-                        save_out_telemetry(telemetry, telemetry_dir_path, telemetry_filename)
+                        save_model_weights(model, config, model_weights_dir, new_model_name)
+                        metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
                 else:
                     new_model_name = f'{model_name}_v{version}.pt'
-                    save_model_weights(model, model_weights_dir, new_model_name)
-                    save_out_telemetry(telemetry, telemetry_dir_path, telemetry_filename)
+                    save_model_weights(model, config, model_weights_dir, new_model_name)
+                    metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
             else:
                 new_model_name = f'{model_name}_v{version}.pt'
-                save_model_weights(model, model_weights_dir, new_model_name)
-                save_out_telemetry(telemetry, telemetry_dir_path, telemetry_filename)
-
-
-def save_model_weights(model, directory_path, model_weights_name):
-    model_path = os.path.join(directory_path, model_weights_name)
-    torch.save(model.state_dict(), model_path)
-
-
-def save_out_telemetry(telemetry, telemetry_dir_path, telemetry_filename):
-    list_of_lists = []
-
-    for (epoch, train_loss, train_accuracy) in telemetry['train']:
-        if len(telemetry['val']) > 0:
-            if epoch == telemetry['val'][0][0]:
-                list_of_lists.append([epoch, train_loss, train_accuracy, telemetry['val'][0][1], telemetry['val'][0][2]])
-                telemetry['val'].pop(0)
-            else:
-                list_of_lists.append([epoch, train_loss, train_accuracy, None, None])
+                save_model_weights(model, config, model_weights_dir, new_model_name)
+                metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
         else:
-            list_of_lists.append([epoch, train_loss, train_accuracy, None, None])
-
-    df_telemetry = pd.DataFrame(list_of_lists, columns=['epoch', 'train_loss', 'train_accuracy', 'val_loss', 'val_accuracy'], index=None)
-    full_telemetry_filepath = os.path.join(telemetry_dir_path, telemetry_filename)
-    df_telemetry.to_csv(full_telemetry_filepath, index=False, sep='\t')
+            metrics.append([epoch, train_loss, train_accuracy, None, None])
 
 
-def create_telemetry_dict():
-    telemetry = {'train': [], 'val': []}
-    return telemetry
+def save_model_weights(model, metadata_info, directory_path, model_weights_name):
+
+    '''# Save the model state dictionary and metadata
+        save_path = 'model_with_metadata.pt'
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'metadata': metadata
+        }, save_path)
+    '''
+    model_path = os.path.join(directory_path, model_weights_name)
+    torch.save({'model_state_dict': model.state_dict(), 'metadata': metadata_info}, model_path)
+
+
+def save_out_metrics(metrics_dir_path, metrics_filename, metrics):
+    path_to_metric_file = os.path.join(metrics_dir_path, metrics_filename)
+
+    with open(path_to_metric_file, 'a', newline='') as csv_out:
+        writer = csv.writer(csv_out, delimiter='\t')
+        writer.writerows(metrics)
+
+    return []
+
+
+def initialize_metrics_file(metrics_dir_path, metrics_filename):
+    path_to_metric_file = os.path.join(metrics_dir_path, metrics_filename)
+
+    with open(path_to_metric_file, 'w', newline='') as csv_out:
+        writer = csv.writer(csv_out, delimiter='\t')
+        writer.writerow(['Epoch', 'Train_loss', 'Train_accuracy', 'Test_loss', 'Test_accuracy'])
 
 
 def main(config_file: str, normal_transforms, augment_transforms):
@@ -155,10 +184,6 @@ def main(config_file: str, normal_transforms, augment_transforms):
     optimizer_name = config['model_hyper_parameters']['optimizer_name']
     learning_rate = config['model_hyper_parameters']['learning_rate']
     weight_decay = config['model_hyper_parameters']['weight_decay']
-    
-    file_paths = config['paths']
-    model_hyper_parameters = config['model_hyper_parameters']
-    other_parameters = config['other_parameters']
 
     path_to_images_and_labels = config['paths']['image_paths_and_labels']
     df = pd.read_csv(path_to_images_and_labels, sep='\t')
@@ -167,11 +192,29 @@ def main(config_file: str, normal_transforms, augment_transforms):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device: ', device, flush=True)
 
-    train_dataloader, val_dataloader = DatasetCreator().get_dataset(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, stratified_split, test_size)
+    dataset_creator = DatasetCreator()
+    int_to_class_map = dataset_creator.get_int_to_class_map(df)
+    config['int_to_class_map'] = int_to_class_map
+
+    train_dataloader, val_dataloader = dataset_creator.get_dataset(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, stratified_split, test_size)
 
     augmenter = Augmenter(augment_transforms)
 
     model = select_model(model_name, output_classes, device)
+
+    if config['paths']['transfer_learn_weights_file']:
+        model_data = torch.load(config['paths']['transfer_learn_weights_file'], map_location='cpu')
+        if 'model_state_dict' in model_data:
+            model_state_dict = model_data['model_state_dict']
+            metadata_dict = model_data['metadata']
+            if int_to_class_map == metadata_dict['int_to_class_map'] and model_name == metadata_dict['model_architecture_parameters']['model_name']:
+                model.load_state_dict(model_state_dict)
+            else:
+                raise CustomException("The number of output classes, the type of output classes or the model architecture doesn't match the model you're attempting to perform transfer learning with.")
+
+        else:
+            model.load_state_dict(model_data)
+
 
     config['paths']['model_weights_directory'] = os.path.join(config['paths']['model_weights_directory'], model_name)
     if not os.path.isdir(config['paths']['model_weights_directory']):
@@ -182,9 +225,7 @@ def main(config_file: str, normal_transforms, augment_transforms):
     loss_objective = torch.nn.CrossEntropyLoss()
     accuracy_objective = MulticlassAccuracy(num_classes=output_classes)
 
-    telemetry = create_telemetry_dict()
-
-    train(train_dataloader, val_dataloader, augmenter, model, device, model_name, optimizer, loss_objective, accuracy_objective, telemetry, file_paths, model_hyper_parameters, other_parameters)
+    train(train_dataloader, val_dataloader, augmenter, model, device, model_name, optimizer, loss_objective, accuracy_objective, config)
 
 
 if __name__ == '__main__':
