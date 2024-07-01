@@ -23,6 +23,9 @@ class CustomException(Exception):
 
 
 def load_config(config_file):
+    '''
+    This function loads a .yaml file for the script to use. 
+    '''
     with open(config_file, 'r') as stream:
         try:
             config = yaml.safe_load(stream)
@@ -33,10 +36,15 @@ def load_config(config_file):
 
 
 def select_optimizer(model, optimizer_name: str, learning_rate: float, weight_decay=0):
+    '''
+    This function can be extended. It currently supports return the adam optimizer or classic gradient descent. 
+    '''
     if optimizer_name == 'adam':
         return torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_name == 'sgd':
         return torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    else:
+        raise CustomException("Invalid optimizer selected. See select_optimizer function for more details.")
 
 
 def train_step(data_loader, augmenter, model, device, optimizer, loss_objective, accuracy_objective):
