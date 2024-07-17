@@ -8,18 +8,21 @@ from torchvision.transforms import v2
 
 
 class ImageDataset(Dataset):
-    def __init__(self, paths, labels=None, transform=None):
+    '''
+    This is a vanilla dataset class that inherits from pytorch's Dataset class. It pulls images from disk to feed to the model. 
+    '''
+    def __init__(self, paths: list, labels: list = None, transforms: list = None):
         self.paths = paths
         self.labels = labels
-        self.transform = transform
+        self.transforms = v2.Compose(transforms)
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, index):
         image = default_loader(self.paths[index])
-        if self.transform is not None:
-            image = self.transform(image)
+        if self.transforms is not None:
+            image = self.transforms(image)
         
         if self.labels:
             return image, self.labels[index]
@@ -28,12 +31,15 @@ class ImageDataset(Dataset):
 
 
 class ImageDatasetInRAM(Dataset):
-    def __init__(self, paths, labels=None, transform=None):
+    '''
+    This is a vanilla dataset class that inherits from pytorch's Dataset class. It pulls holds all images in RAM to feed to the model. 
+    '''
+    def __init__(self, paths: list, labels: list = None, transforms: list = None):
         self.paths = paths
         self.labels = labels
-        self.transform = transform
-        if self.transform:
-            self.images = [self.transform(default_loader(path)) for path in self.paths]
+        self.transforms = v2.Compose(transforms)
+        if self.transforms:
+            self.images = [self.transforms(default_loader(path)) for path in self.paths]
         else:
             self.images = [default_loader(path) for path in self.paths]
 
@@ -48,7 +54,9 @@ class ImageDatasetInRAM(Dataset):
 
 
 class DatasetCreator():
-
+    '''
+    This class is made to create a dataset. Its main function is get_dataset(). 
+    '''
 
     def convert_classes_to_int(self, df: pd.DataFrame):
         class_to_int = self.get_class_to_int_map(df)

@@ -6,7 +6,7 @@ import sys
 import csv
 from tqdm import tqdm
 from torchmetrics.classification import MulticlassAccuracy
-sys.path.append('/grphome/fslg_census/compute/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
+sys.path.append('/grphome/fslg_census/compute/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch')
 from src.model import select_model 
 from src.get_data import DatasetCreator, Augmenter
 
@@ -178,7 +178,7 @@ def initialize_metrics_file(metrics_dir_path, metrics_filename):
         writer.writerow(['Epoch', 'Train_loss', 'Train_accuracy', 'Test_loss', 'Test_accuracy'])
 
 
-def main(config_file: str, normal_transforms, augment_transforms):
+def start_training(config_file: str, normal_transforms, augment_transforms):
     config = load_config(config_file)
     
     batch_size = config['dataset_params']['batch_size']
@@ -197,7 +197,7 @@ def main(config_file: str, normal_transforms, augment_transforms):
     df = pd.read_csv(path_to_images_and_labels, sep='\t')
     df.columns = ['path', 'label']
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu' # torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device: ', device, flush=True)
 
     dataset_creator = DatasetCreator()
@@ -234,7 +234,3 @@ def main(config_file: str, normal_transforms, augment_transforms):
     accuracy_objective = MulticlassAccuracy(num_classes=output_classes)
 
     train(train_dataloader, val_dataloader, augmenter, model, device, model_name, optimizer, loss_objective, accuracy_objective, config)
-
-
-if __name__ == '__main__':
-    main()

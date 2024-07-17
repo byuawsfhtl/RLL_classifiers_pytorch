@@ -1,29 +1,29 @@
 paths:
   model_weights_directory: /grphome/fslg_census/compute/machine_learning_models/classification_models/general_weights
-  transfer_learn_weights_name:
-  metrics_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/telemetry
-  image_paths_and_labels: /home/jroubido/fsl_groups/fslg_census/compute/machine_learning_models/latent_feature_clustering/temp_datasets/us_census_1940_sampled/sampled_data.tsv
+  transfer_learn_weights_file:
+  metrics_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/metrics
+  image_paths_and_labels: /grphome/fslg_census/compute/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch/tests/resources/labels_for_gender_snippets.tsv
 
 dataset_params:
-  dataset_name: Alabama_and_US_Census_gender_snippets
+  dataset_name: test_resources_gender
   inference: False
-  batch_size: 10
-  hold_images_in_RAM: False
+  batch_size: 2
+  hold_images_in_RAM: True
   random_split: True
   stratified_split: True
-  test_size: .2
+  test_size: .1
 
 model_architecture_parameters:
   model_name: resnet50
-  output_classes: 10
+  output_classes: 2
 
 model_hyper_parameters:
   learning_rate: .001
-  epochs: 200
+  epochs: 20
   optimizer_name: adam
   weight_decay: 0
 
 other_parameters:
   early_stopping: False
   track_val_every_n_epochs: 20
-  version: 3
+  version: 4
