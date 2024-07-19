@@ -1,5 +1,6 @@
 import torch
 import torchvision.models as networks
+from custom_exception import CustomException
 
 def select_model(model_name: str, output_classes: int, device: str):
     '''
@@ -34,7 +35,7 @@ def select_model(model_name: str, output_classes: int, device: str):
         return networks.densenet201(num_classes=output_classes).to(device)
 
 
-def load_model(model_name: str, output_classes: int, path_to_weights: str):
+def load_model(model_name: str, output_classes: int, int_to_class_map: dict, path_to_weights: str, device: str):
     '''
     This function will load a model architecture with a defined number of output classes and will load existing weights
     for this given model. 
@@ -46,5 +47,16 @@ def load_model(model_name: str, output_classes: int, path_to_weights: str):
     '''
     
     model = select_model(model_name, output_classes)
-    model.load_state_dict(torch.load(path_to_weights, map_location='cpu'))
-    return model
+    model_data = torch.load(path_to_weights, map_location='cpu')
+    
+    if 'model_state_dict' in model_data:
+        model_state_dict = model_data['model_state_dict']
+        metadata_dict = model_data['metadata']
+        if int_to_class_map == metadata_dict['int_to_class_map'] and model_name == metadata_dict['model_architecture_parameters']['model_name']:
+            model.load_state_dict(model_state_dict)
+        else:
+            raise CustomException("The number of output classes, the type of output classes or the model architecture doesn't match the model you're attempting to perform transfer learning with.")
+    else:
+        model.load_state_dict(model_data)
+
+    return model.to(device)

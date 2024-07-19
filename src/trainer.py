@@ -6,23 +6,12 @@ import sys
 import csv
 from tqdm import tqdm
 from torchmetrics.classification import MulticlassAccuracy
-sys.path.append('/grphome/fslg_census/compute/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch')
-from src.model import select_model 
+sys.path.append('/grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch')
+from src.model import select_model, load_model
 from src.get_data import DatasetCreator, Augmenter
+from src.custom_exception import CustomException
 
-
-class CustomException(Exception):
-    """A custom exception class. Used to identify error with our scripts."""
-
-    def __init__(self, message=""):
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self):
-        return f"{self.__class__.__name__}: {self.message}"
-
-
-def load_config(config_file):
+def load_config(config_file: str):
     '''
     This function loads a .yaml file for the script to use. 
     '''
@@ -48,6 +37,18 @@ def select_optimizer(model, optimizer_name: str, learning_rate: float, weight_de
 
 
 def train_step(data_loader, augmenter, model, device, optimizer, loss_objective, accuracy_objective):
+    '''
+    This function defines a step in the training process. 
+
+    Args:
+        data_loader: A Pytorch Dataloader object. It holds the images for the model to train on
+        augmenter: An augmenter object (custom class), it performs transformations to the image data to help enrich the training process
+        model: A pytorch model that we are training 
+        device: This defines where the model and data should be: 'cpu' or 'cuda'
+        optimizer: An optimizer object that will perform gradient descent (or another optimization technique) to help the model learn
+        loss_objective: Our loss function to define how our model is performing and to help the model learn
+        accuracy_objective: A function that scores the model's accuracy
+    '''
     loss_over_step = 0
     classification_accuracy = 0
     number_batches = len(data_loader)
@@ -96,7 +97,6 @@ def validation_step(data_loader, model, device, loss_objective, accuracy_objecti
             
             predicted_classes = torch.argmax(predictions, dim=1)
             classification_accuracy += accuracy_objective(predicted_classes.cpu(), labels.cpu()).item()
-
     average_loss = loss_over_step / number_batches
     average_accuracy = classification_accuracy / number_batches
 
@@ -106,11 +106,23 @@ def validation_step(data_loader, model, device, loss_objective, accuracy_objecti
 def train(train_dataloader, val_dataloader, augmenter, model, device, model_name: str, optimizer, loss_objective, accuracy_objective, config: dict):
     
     epochs = config['model_hyper_parameters']['epochs']
-    version = config['other_parameters']['version']
     early_stopping = config['other_parameters']['early_stopping']
     track_val_every_n_epochs = config['other_parameters']['track_val_every_n_epochs']
     model_weights_dir = config['paths']['model_weights_directory']
     metrics_dir_path = config['paths']['metrics_dir_path']
+
+    version = 1
+    model_file_name = f'{model_name}_v{version}.pt'
+    model_path = os.path.join(model_weights_dir, model_file_name)
+
+    if not os.path.exists(metrics_dir_path):
+        os.makedirs(model_weights_dir)
+
+    while os.path.exists(model_path):
+        model_file_name = f'{model_name}_v{version}.pt'
+        model_path = os.path.join(model_weights_dir, model_file_name)
+        version += 1 
+        
     metrics_filename = f'{model_name}_v{version}.tsv'
     
     metrics = []
@@ -126,28 +138,26 @@ def train(train_dataloader, val_dataloader, augmenter, model, device, model_name
             
             metrics.append([epoch, train_loss, train_accuracy, val_loss, val_accuracy])
             val_loss_scores.append(val_loss)
+            config['epochs_trained_so_far'] = epoch
 
             if early_stopping:
                 if len(val_loss_scores) > 2:
                     if (val_loss_scores[-2] < val_loss_scores[-1]) and (val_loss_scores[-3] < val_loss_scores[-2]):
                         break
                     else:
-                        new_model_name = f'{model_name}_v{version}.pt'
-                        save_model_weights(model, config, model_weights_dir, new_model_name)
+                        save_model_weights(model, config, model_path)
                         metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
                 else:
-                    new_model_name = f'{model_name}_v{version}.pt'
-                    save_model_weights(model, config, model_weights_dir, new_model_name)
+                    save_model_weights(model, config, model_path)
                     metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
             else:
-                new_model_name = f'{model_name}_v{version}.pt'
-                save_model_weights(model, config, model_weights_dir, new_model_name)
+                save_model_weights(model, config, model_path)
                 metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
         else:
             metrics.append([epoch, train_loss, train_accuracy, None, None])
 
 
-def save_model_weights(model, metadata_info, directory_path, model_weights_name):
+def save_model_weights(model, metadata_info, model_path):
 
     '''# Save the model state dictionary and metadata
         save_path = 'model_with_metadata.pt'
@@ -156,7 +166,6 @@ def save_model_weights(model, metadata_info, directory_path, model_weights_name)
             'metadata': metadata
         }, save_path)
     '''
-    model_path = os.path.join(directory_path, model_weights_name)
     torch.save({'model_state_dict': model.state_dict(), 'metadata': metadata_info}, model_path)
 
 
@@ -192,39 +201,27 @@ def start_training(config_file: str, normal_transforms, augment_transforms):
     optimizer_name = config['model_hyper_parameters']['optimizer_name']
     learning_rate = config['model_hyper_parameters']['learning_rate']
     weight_decay = config['model_hyper_parameters']['weight_decay']
+    device = config['model_hyper_parameters']['device']
 
     path_to_images_and_labels = config['paths']['image_paths_and_labels']
     df = pd.read_csv(path_to_images_and_labels, sep='\t')
     df.columns = ['path', 'label']
 
-    device = 'cpu' # torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device: ', device, flush=True)
 
     dataset_creator = DatasetCreator()
     int_to_class_map = dataset_creator.get_int_to_class_map(df)
     config['int_to_class_map'] = int_to_class_map
 
-    train_dataloader, val_dataloader = dataset_creator.get_dataset(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, stratified_split, test_size)
+    train_dataloader, val_dataloader = dataset_creator.get_dataloader(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, stratified_split, test_size)
 
     augmenter = Augmenter(augment_transforms)
 
-    model = select_model(model_name, output_classes, device)
-
     if config['paths']['transfer_learn_weights_file']:
-        model_data = torch.load(config['paths']['transfer_learn_weights_file'], map_location='cpu')
-        if 'model_state_dict' in model_data:
-            model_state_dict = model_data['model_state_dict']
-            metadata_dict = model_data['metadata']
-            if int_to_class_map == metadata_dict['int_to_class_map'] and model_name == metadata_dict['model_architecture_parameters']['model_name']:
-                model.load_state_dict(model_state_dict)
-            else:
-                raise CustomException("The number of output classes, the type of output classes or the model architecture doesn't match the model you're attempting to perform transfer learning with.")
+        model = load_model(model_name, output_classes, int_to_class_map, config['paths']['transfer_learn_weights_file'], device)
+    else:
+        model = select_model(model_name, output_classes, device)
 
-        else:
-            model.load_state_dict(model_data)
-
-
-    config['paths']['model_weights_directory'] = os.path.join(config['paths']['model_weights_directory'], model_name)
     if not os.path.isdir(config['paths']['model_weights_directory']):
         os.makedirs(config['paths']['model_weights_directory'])
 

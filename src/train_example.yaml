@@ -1,8 +1,8 @@
 paths:
-  model_weights_directory: /grphome/fslg_census/compute/machine_learning_models/classification_models/general_weights
+  model_weights_directory: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/general_weights
   transfer_learn_weights_file:
-  metrics_dir_path: /grphome/fslg_census/compute/machine_learning_models/classification_models/metrics
-  image_paths_and_labels: /grphome/fslg_census/compute/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch/tests/resources/labels_for_gender_snippets.tsv
+  metrics_dir_path: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/metrics
+  image_paths_and_labels: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch/tests/resources/labels_for_gender_snippets.tsv
 
 dataset_params:
   dataset_name: test_resources_gender
@@ -22,8 +22,8 @@ model_hyper_parameters:
   epochs: 20
   optimizer_name: adam
   weight_decay: 0
+  device: cpu
 
 other_parameters:
   early_stopping: False
   track_val_every_n_epochs: 20
-  version: 4
