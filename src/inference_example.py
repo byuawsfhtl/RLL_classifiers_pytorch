@@ -3,7 +3,7 @@ from torchvision.transforms import v2
 from torchvision.datasets.folder import default_loader
 import sys
 import os
-sys.path.append('/grphome/fslg_census/compute/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
+sys.path.append('/grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
 from src.model import select_model 
 
 

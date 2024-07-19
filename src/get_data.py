@@ -116,7 +116,7 @@ class DatasetCreator():
         return class_to_int
 
 
-    def stratified_sampling(self, labels_and_paths: pd.DataFrame, randomize: bool, test_size: float):
+    def stratified_sampling(self, labels_and_paths: pd.DataFrame, randomize: bool, random_state: int, test_size: float):
         '''
         This function performs a stratified sampling technique for the train and test sets.
 
@@ -131,7 +131,7 @@ class DatasetCreator():
 
         for field, group_data in grouped:
             group_data = group_data.sample(frac=1)
-            train_paths, test_paths, train_labels, test_labels = train_test_split(group_data['path'], group_data['class_index'], test_size=test_size, shuffle=randomize)
+            train_paths, test_paths, train_labels, test_labels = train_test_split(group_data['path'], group_data['class_index'], test_size=test_size, shuffle=randomize, random_state=random_state)
             training_paths += train_paths.tolist()
             training_labels += train_labels.tolist()
             testing_paths += test_paths.tolist()
@@ -140,7 +140,7 @@ class DatasetCreator():
         return training_paths, testing_paths, training_labels, testing_labels
 
 
-    def get_train_and_test_sets(self, labels_and_paths: pd.DataFrame, random_split: bool, stratified_split: bool, test_size: float):
+    def get_train_and_test_sets(self, labels_and_paths: pd.DataFrame, random_split: bool, random_state: int, stratified_split: bool, test_size: float):
         '''
         This function gets paths and labels (class_index) for training and testing. 
 
@@ -152,20 +152,20 @@ class DatasetCreator():
         '''
         if random_split:
             if stratified_split:
-                return self.stratified_sampling(labels_and_paths, True, test_size)
+                return self.stratified_sampling(labels_and_paths, True, random_state, test_size)
             else:
                 labels_and_paths = labels_and_paths.sample(frac=1)
-                training_paths, testing_paths, training_labels, testing_labels = train_test_split(labels_and_paths['path'], labels_and_paths['class_index'], test_size=test_size)
+                training_paths, testing_paths, training_labels, testing_labels = train_test_split(labels_and_paths['path'], labels_and_paths['class_index'], test_size=test_size, shuffle=random_split, random_state=random_state)
                 return training_paths.tolist(), testing_paths.tolist(), training_labels.tolist(), testing_labels.tolist()
         else:
             if stratified_split:
-                return self.stratified_sampling(labels_and_paths, False, test_size)
+                return self.stratified_sampling(labels_and_paths, False, random_state, test_size)
             else:
                 training_paths, testing_paths, training_labels, testing_labels = train_test_split(labels_and_paths['path'], labels_and_paths['class_index'], test_size=test_size, shuffle=False)
                 return training_paths.tolist(), testing_paths.tolist(), training_labels.tolist(), testing_labels.tolist()
 
 
-    def get_dataloader(self, labels_and_paths: pd.DataFrame, inference: bool, transforms: list, batch_size: int, hold_images_in_RAM: bool = False, random_split: bool = None, stratified_split: bool = None, test_size: float = None):
+    def get_dataloader(self, labels_and_paths: pd.DataFrame, inference: bool, transforms: list, batch_size: int, hold_images_in_RAM: bool = False, random_split: bool = None, random_state: int = None, stratified_split: bool = None, test_size: float = None):
         '''
         This is the main function of the DatasetCreator class. It gets the datasets that the user will need for training. 
 
@@ -187,7 +187,7 @@ class DatasetCreator():
             dataloader = DataLoader(dataset, batch_size = batch_size)
             return dataloader
         else:
-            training_paths, testing_paths, training_labels, testing_labels = self.get_train_and_test_sets(labels_and_paths, random_split, stratified_split, test_size)
+            training_paths, testing_paths, training_labels, testing_labels = self.get_train_and_test_sets(labels_and_paths, random_split, random_state, stratified_split, test_size)
             
             if hold_images_in_RAM:
                 train_dataset = ImageDatasetInRAM(training_paths, training_labels, transforms)

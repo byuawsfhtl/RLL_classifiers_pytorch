@@ -6,10 +6,11 @@ import sys
 import csv
 from tqdm import tqdm
 from torchmetrics.classification import MulticlassAccuracy
-sys.path.append('/grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch')
+sys.path.append('/grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
 from src.model import select_model, load_model
 from src.get_data import DatasetCreator, Augmenter
 from src.custom_exception import CustomException
+
 
 def load_config(config_file: str):
     '''
@@ -97,6 +98,7 @@ def validation_step(data_loader, model, device, loss_objective, accuracy_objecti
             
             predicted_classes = torch.argmax(predictions, dim=1)
             classification_accuracy += accuracy_objective(predicted_classes.cpu(), labels.cpu()).item()
+    
     average_loss = loss_over_step / number_batches
     average_accuracy = classification_accuracy / number_batches
 
@@ -119,9 +121,10 @@ def train(train_dataloader, val_dataloader, augmenter, model, device, model_name
         os.makedirs(model_weights_dir)
 
     while os.path.exists(model_path):
+        version += 1 
         model_file_name = f'{model_name}_v{version}.pt'
         model_path = os.path.join(model_weights_dir, model_file_name)
-        version += 1 
+       
         
     metrics_filename = f'{model_name}_v{version}.tsv'
     
@@ -155,7 +158,6 @@ def train(train_dataloader, val_dataloader, augmenter, model, device, model_name
                 metrics = save_out_metrics(metrics_dir_path, metrics_filename, metrics)
         else:
             metrics.append([epoch, train_loss, train_accuracy, None, None])
-
 
 def save_model_weights(model, metadata_info, model_path):
 
@@ -194,6 +196,7 @@ def start_training(config_file: str, normal_transforms, augment_transforms):
     hold_images_in_RAM = config['dataset_params']['hold_images_in_RAM']
     inference = config['dataset_params']['inference']
     random_split = config['dataset_params']['random_split']
+    random_state = config['dataset_params']['random_state']
     stratified_split = config['dataset_params']['stratified_split']
     test_size = config['dataset_params']['test_size']
     model_name = config['model_architecture_parameters']['model_name'] 
@@ -213,7 +216,7 @@ def start_training(config_file: str, normal_transforms, augment_transforms):
     int_to_class_map = dataset_creator.get_int_to_class_map(df)
     config['int_to_class_map'] = int_to_class_map
 
-    train_dataloader, val_dataloader = dataset_creator.get_dataloader(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, stratified_split, test_size)
+    train_dataloader, val_dataloader = dataset_creator.get_dataloader(df, inference, normal_transforms, batch_size, hold_images_in_RAM, random_split, random_state, stratified_split, test_size)
 
     augmenter = Augmenter(augment_transforms)
 

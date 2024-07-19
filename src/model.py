@@ -1,6 +1,8 @@
 import torch
 import torchvision.models as networks
-from custom_exception import CustomException
+import sys
+sys.path.append('/grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch')
+from src.custom_exception import CustomException
 
 def select_model(model_name: str, output_classes: int, device: str):
     '''

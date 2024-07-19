@@ -2,7 +2,7 @@ paths:
   model_weights_directory: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/general_weights
   transfer_learn_weights_file:
   metrics_dir_path: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/metrics
-  image_paths_and_labels: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch/tests/resources/labels_for_gender_snippets.tsv
+  image_paths_and_labels: /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch/tests/resources/labels_for_gender_snippets.tsv
 
 dataset_params:
   dataset_name: test_resources_gender
@@ -10,6 +10,7 @@ dataset_params:
   batch_size: 2
   hold_images_in_RAM: True
   random_split: True
+  random_state:
   stratified_split: True
   test_size: .1
 

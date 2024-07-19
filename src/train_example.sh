@@ -13,4 +13,4 @@
 export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
 
 # LOAD MODULES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
-/grphome/fslg_census/compute/envs/torch/bin/python /grphome/fslg_census/compute/machine_learning_models/classification_models/branches/jackson/RLL_classifiers_pytorch/src/train_example.py
+/grphome/fslg_census/nobackup/archive/envs/torch/bin/python /grphome/fslg_census/nobackup/archive/machine_learning_models/classification_models/branches/main/RLL_classifiers_pytorch/src/train_example.py
