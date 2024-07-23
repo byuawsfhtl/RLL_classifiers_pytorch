@@ -48,7 +48,7 @@ def load_model(model_name: str, output_classes: int, int_to_class_map: dict, pat
         path_to_weights: The file path to weights for the given model. 
     '''
     
-    model = select_model(model_name, output_classes)
+    model = select_model(model_name, output_classes, device)
     model_data = torch.load(path_to_weights, map_location='cpu')
     
     if 'model_state_dict' in model_data:
